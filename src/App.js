@@ -1,26 +1,99 @@
 import React from 'react';
 import logo from './logo.svg';
+import Chart from "./chart";
+import { withStyles } from "@material-ui/core/styles";
 import './App.css';
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+const styles=theme=>({
+  "chart-container":{
+    height:400
+  }
+});
+
+class App extends React.Component {
+  constructor(){
+    super()
+    this.state={
+      lineChartData:{
+        labels:[],
+        datasets:[
+          {
+            type:"line",
+            label:"BTC-Rupee",
+            backgroundColor:"rgba(0,0,0,0)",
+            borderColor:this.props.theme.palette.secondary.main,
+            pointBorderColor:this.props.theme.palette.secondary.main,
+            bordrWidth:"2",
+            lineTension:0.45,
+            data:[]
+          }
+        ]
+      },
+      lineChartOptions:{
+        responsive:true,
+        maintainAspectRatio:false,
+        toolTips:{
+          enabled:true
+        },
+        scales:{
+          xAxes:[
+            {
+              ticks:{
+                autoSkip:true,
+                maxTickLimit:10
+              }
+            }
+          ]
+        }
+      }
+    };
+  }
+ 
+  componentDidMount(){
+    const subscribe={
+      type:"subscribe",
+      channels:[
+        {
+          name:ticker,
+          product_ids:["BTC_INR"]
+        }
+      ]
+    };
+    this.ws = new WebSocket("wss://ws-feed.gdax.com");
+    this.ws.onopen=()=>{
+      this.ws.send(JSON.stringify(subscribe));
+    };
+    this.ws.onmessage=e=>{
+      const value=JSON.parse(e.data);
+      if(value.type!=="ticker"){
+        return;
+      }
+      const oldBtcDataSet = this.state.lineChartData.datasets[0];
+      const newBtcDataSet = { ...oldBtcDataSet };
+      newBtcDataSet.data.push(value.price);
+      const newChartData={
+        ...this.state.lineChartData,
+        datasets:[newBtcDataSet],
+        labels: this.state.lineChartData.labels.concat(
+          new Date().toLocaleDateString()
+        )
+      };
+      this.setState({ lineChartData: newChartData});
+    };
+  }
+
+  componentWillUnmount(){
+    this.ws.close();
+  }
+render(){
+  const{ classes }=this.props;
+  return(
+    <div className={classes["chart-container"]}>
+      <Chart data={this.state.lineChartData}
+              options={this.state.lineChartOptions} />
     </div>
   );
 }
+}
 
-export default App;
+export default withStyles(styles, {withTheme:true})(App);
